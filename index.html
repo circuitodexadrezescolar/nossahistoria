@@ -51,10 +51,26 @@
     border-radius:3px;padding:22px 22px 24px;
     backdrop-filter:blur(6px);
     max-height:min(66vh,560px);overflow-y:auto;
+    transition:opacity .35s ease, transform .35s ease;
+  }
+  .carta.recolhida{opacity:0;transform:translateX(22px);pointer-events:none}
+  .alternar{
+    display:none;position:absolute;top:10px;right:10px;z-index:2;
+    font-family:var(--sig);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    background:rgba(18,16,12,.9);border:1px solid var(--linha);color:var(--ouro);
+    padding:7px 12px;border-radius:2px;cursor:pointer;
   }
   @media (max-width:760px){
     .hud{grid-template-rows:auto 1fr auto}
-    .carta{justify-self:stretch;align-self:end;width:100%;max-height:50vh}
+    .carta{
+      position:relative;justify-self:stretch;align-self:end;width:100%;
+      max-height:46vh;padding:16px 18px 18px;
+    }
+    .carta .km, .carta .nome{padding-right:80px}
+    .alternar{display:block}
+    .carta.recolhida{opacity:1;transform:none;pointer-events:auto;max-height:none;overflow:visible}
+    .carta.recolhida #corpo{display:none}
+    .carta.recolhida .nome{margin-bottom:0}
   }
   .km{font-family:var(--sig);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--ouro);margin:0 0 6px}
   .nome{font-family:var(--sig);font-weight:500;font-size:clamp(20px,3vw,27px);letter-spacing:.05em;text-transform:uppercase;margin:0 0 12px;text-wrap:balance}
@@ -154,6 +170,7 @@
   </div>
 
   <div class="carta" id="carta">
+    <button class="alternar" id="alternar" type="button" aria-expanded="true">Ocultar</button>
     <p class="km" id="km">Embarque</p>
     <h2 class="nome" id="nome">Onde a linha começa</h2>
     <div id="corpo">
@@ -1428,11 +1445,31 @@
     var e = ESTACOES[i];
     ultima = i;
     km.textContent = e.km; nome.textContent = e.nome; corpo.innerHTML = e.html;
+    abreCarta(true);
     partir.textContent = e.final ? 'Recomeçar a volta' : (e.origem ? 'Dar partida' : 'Seguir viagem');
     partir.disabled = false;
   }
 
+  // No celular o card ocupa metade da tela. Ele se recolhe enquanto o trem
+  // viaja, para o cenário aparecer, e volta sozinho ao chegar na estação.
+  var carta = document.getElementById('carta');
+  var alternar = document.getElementById('alternar');
+  var cartaAberta = true;
+
+  function abreCarta(v){
+    if (cartaAberta === v) return;
+    cartaAberta = v;
+    carta.classList.toggle('recolhida', !v);
+    alternar.textContent = v ? 'Ocultar' : 'Ler';
+    alternar.setAttribute('aria-expanded', v ? 'true' : 'false');
+    if (carta.scrollTop) carta.scrollTop = 0;
+    ajusta(); poeCam();
+  }
+
+  alternar.addEventListener('click', function(){ abreCarta(!cartaAberta); });
+
   partir.addEventListener('click', function(){
+    abreCarta(false);
     andando = true;
     partir.disabled = true;
     partir.textContent = 'Em viagem…';
@@ -1506,7 +1543,7 @@
     var alt = raio * Math.max(1, 0.62 / aspecto);
     fatorSeguir = aspecto < 1 ? 0.80 : 0.46;
     // no celular o card ocupa a parte de baixo: sobe o trem no quadro
-    var desl = aspecto < 1 ? alt * 0.17 : 0;
+    var desl = aspecto < 1 ? alt * (cartaAberta ? 0.17 : 0.04) : 0;
     cam.left = -alt * aspecto / 2; cam.right = alt * aspecto / 2;
     cam.top = alt / 2 - desl; cam.bottom = -alt / 2 - desl;
     cam.updateProjectionMatrix();
@@ -1579,3 +1616,4 @@
   })(performance.now());
 })();
 </script>
+
