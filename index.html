@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Nossa História - Circuito de Xadrez Escolar</title>
+<title>Nossa História - Circuito de Xadrez</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Lora:wght@400;500&display=swap">
@@ -23,7 +23,12 @@
     font-family:var(--prosa);line-height:1.6;overflow:hidden;
   }
   #cena{position:fixed;inset:0;display:block}
-  #cena canvas{display:block;width:100%;height:100%}
+  #cena canvas{
+    display:block;width:100%;height:100%;
+    touch-action:none;            /* o arrasto é nosso, não do navegador */
+    -webkit-user-select:none;user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
 
   .hud{
     position:fixed;inset:0;pointer-events:none;
@@ -1565,19 +1570,70 @@
   });
   ajusta(); poeCam();
 
-  var arrasta = false, px = 0;
   var el = render.domElement;
-  el.addEventListener('pointerdown', function(e){ arrasta = true; px = e.clientX; el.setPointerCapture(e.pointerId); });
-  el.addEventListener('pointerup', function(e){ arrasta = false; });
+  var dedos = {}, quantos = 0;
+  var ultimoX = 0, pinca = 0, raioPinca = 0;
+
+  function limites(r){ return Math.max(26, Math.min(110, r)); }
+
+  function ativos(){
+    var lista = [];
+    for (var id in dedos) lista.push(dedos[id]);
+    return lista;
+  }
+
+  function separacao(l){
+    var dx = l[0].x - l[1].x, dy = l[0].y - l[1].y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  el.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    try { el.setPointerCapture(e.pointerId); } catch (x) {}
+    dedos[e.pointerId] = { x:e.clientX, y:e.clientY };
+    quantos++;
+    var l = ativos();
+    if (l.length === 1) ultimoX = e.clientX;
+    else if (l.length === 2){ pinca = separacao(l); raioPinca = raio; }
+  });
+
+  function soltou(e){
+    if (!dedos[e.pointerId]) return;
+    delete dedos[e.pointerId];
+    quantos--;
+    pinca = 0;
+    var l = ativos();
+    if (l.length === 1) ultimoX = l[0].x;   // retoma o giro sem pulo
+  }
+  el.addEventListener('pointerup', soltou);
+  el.addEventListener('pointercancel', soltou);
+  el.addEventListener('lostpointercapture', soltou);
+
   el.addEventListener('pointermove', function(e){
-    if (!arrasta) return;
-    azim += (e.clientX - px) * 0.006;
-    px = e.clientX;
+    var d = dedos[e.pointerId];
+    if (!d) return;
+    e.preventDefault();
+    d.x = e.clientX; d.y = e.clientY;
+    var l = ativos();
+
+    if (l.length >= 2){        // dois dedos: aproxima e afasta
+      if (!pinca){ pinca = separacao(l); raioPinca = raio; return; }
+      var agora = separacao(l);
+      if (agora > 6){
+        raio = limites(raioPinca * pinca / agora);
+        ajusta(); poeCam();
+      }
+      return;
+    }
+
+    azim += (e.clientX - ultimoX) * 0.006;   // um dedo: gira
+    ultimoX = e.clientX;
     poeCam();
   });
+
   el.addEventListener('wheel', function(e){
     e.preventDefault();
-    raio = Math.max(26, Math.min(110, raio + e.deltaY * 0.05));
+    raio = limites(raio + e.deltaY * 0.05);
     ajusta(); poeCam();
   }, {passive:false});
 
@@ -1615,5 +1671,7 @@
     render.render(cena, cam);
   })(performance.now());
 })();
+</script>
+
 </script>
 
